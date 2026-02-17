@@ -20,7 +20,7 @@ codereport keeps all of this in one place: a repo-owned list of reports, keyed b
 
 ---
 
-## Value proposition (landing / pitch)
+## Key benefits
 
 - **One source of truth** — All code follow-ups (TODOs, refactors, bugs, critical) in a single YAML store under `.codereports/`, versioned with the repo.
 - **Precise location** — Every report is tied to a path and line range (`path:start-end`), so you know exactly where to look.
@@ -32,7 +32,7 @@ codereport keeps all of this in one place: a repo-owned list of reports, keyed b
 
 ---
 
-## Features (for feature lists / comparison)
+## Features
 
 | Feature | Description |
 |--------|-------------|
@@ -46,7 +46,7 @@ codereport keeps all of this in one place: a repo-owned list of reports, keyed b
 
 ---
 
-## Use cases (for landing / docs)
+## Use cases
 
 - **Code review follow-ups** — Add a report instead of a vague “address this later” comment; assign severity and optional expiry; track in one place.
 - **Tech debt and refactors** — Use the refactor tag with an expiration so refactors don’t sit forever; see which files have the most in the heatmap.

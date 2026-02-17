@@ -1,6 +1,6 @@
 [package]
 name = "codereport"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Track code follow-ups (TODOs, refactors, bugs, critical) with tags, expiration, and CI checks."
 license = "MIT"
