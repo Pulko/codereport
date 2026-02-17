@@ -70,10 +70,6 @@ impl Reports {
             false
         }
     }
-
-    pub fn by_id(&self, id: &str) -> Option<&ReportEntry> {
-        self.entries.iter().find(|e| e.id == id)
-    }
 }
 
 fn parse_report_id(id: &str) -> Option<u32> {
@@ -110,11 +106,6 @@ pub fn save_reports(repo_root: &Path, reports: &Reports) -> Result<(), String> {
     std::fs::write(&temp, yaml).map_err(|e| format!("write reports: {}", e))?;
     std::fs::rename(&temp, &dest).map_err(|e| format!("rename reports: {}", e))?;
     Ok(())
-}
-
-/// Build Author for serialization from resolved author.
-pub fn author_from_resolved(git: Option<String>, codeowner: Option<String>) -> Author {
-    Author { git, codeowner }
 }
 
 #[cfg(test)]

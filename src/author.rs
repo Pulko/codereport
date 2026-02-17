@@ -77,9 +77,11 @@ pub fn resolve_author(repo_root: &Path, path: &str, start: u32, end: u32) -> Res
     // Try cache lookup (only when we have a blob OID so cache is valid)
     if let Some(ref oid) = oid_opt {
         let cache = load_blame_cache(repo_root);
-        if let Some(entry) = cache.entries.iter().find(|e| {
-            e.path == path && e.start == start && e.end == end && e.oid == *oid
-        }) {
+        if let Some(entry) = cache
+            .entries
+            .iter()
+            .find(|e| e.path == path && e.start == start && e.end == end && e.oid == *oid)
+        {
             if author.git.is_none() && !entry.email.is_empty() {
                 author.git = Some(entry.email.clone());
             }
@@ -107,7 +109,9 @@ pub fn resolve_author(repo_root: &Path, path: &str, start: u32, end: u32) -> Res
     if let (Some(oid), Some(email)) = (oid_opt, email_opt) {
         let mut cache = load_blame_cache(repo_root);
         // Remove existing entry with same key if any
-        cache.entries.retain(|e| !(e.path == path && e.start == start && e.end == end && e.oid == oid));
+        cache
+            .entries
+            .retain(|e| !(e.path == path && e.start == start && e.end == end && e.oid == oid));
         cache.entries.push(BlameCacheEntry {
             path: path.to_string(),
             start,

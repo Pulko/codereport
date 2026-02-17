@@ -23,10 +23,6 @@ impl Tag {
             Tag::Critical => "critical",
         }
     }
-
-    pub fn all() -> &'static [Tag] {
-        &[Tag::Todo, Tag::Refactor, Tag::Buggy, Tag::Critical]
-    }
 }
 
 fn to_ascii_lowercase(s: &str) -> String {

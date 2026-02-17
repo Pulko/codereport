@@ -12,14 +12,6 @@ pub fn find_repo_root(cwd: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Returns the path relative to repo root, using forward slashes.
-/// Assumes `path` is under `repo_root`.
-pub fn path_relative_to_root(path: &Path, repo_root: &Path) -> Option<String> {
-    path.strip_prefix(repo_root)
-        .ok()
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
