@@ -2,6 +2,12 @@
 name = "codereport"
 version = "0.1.0"
 edition = "2021"
+description = "Track code follow-ups (TODOs, refactors, bugs, critical) with tags, expiration, and CI checks."
+license = "MIT"
+repository = "https://github.com/Pulko/codereport"
+readme = "README.md"
+keywords = ["cli", "todo", "tech-debt", "code-reports", "ci"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
