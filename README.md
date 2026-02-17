@@ -10,7 +10,7 @@ From the repo root:
 codereport init
 ```
 
-This creates `.codereports/` with `config.yaml` and `schema.json`, and adds or creates the **repo root** `.gitignore` so that `.codereports/html/` and `.codereports/.blame-cache` are ignored (generated dashboard and local blame cache).
+This creates `.codereports/` with `config.yaml`, and adds or creates the **repo root** `.gitignore` so that `.codereports/html/` and `.codereports/.blame-cache` are ignored (generated dashboard and local blame cache).
 
 ## Commands
 
@@ -27,7 +27,6 @@ Track these in version control:
 
 - `.codereports/reports.yaml` — report data
 - `.codereports/config.yaml` — tag and policy config
-- `.codereports/schema.json` — schema
 
 Do **not** track (ignored via repo root `.gitignore`):
 

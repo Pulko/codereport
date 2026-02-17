@@ -17,7 +17,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Initialize .codereports/ with config and schema
+    /// Initialize .codereports/ with config
     Init,
     /// Add a new report
     Add {
@@ -111,13 +111,6 @@ fn cmd_init(repo_root: &std::path::Path) -> ExitCode {
     if !config_path.exists() {
         if let Err(e) = config::write_default_config(repo_root) {
             eprintln!("error: failed to write config.yaml: {}", e);
-            return ExitCode::from(1);
-        }
-    }
-    let schema_path = dir.join("schema.json");
-    if !schema_path.exists() {
-        if let Err(e) = std::fs::write(&schema_path, config::default_schema_json()) {
-            eprintln!("error: failed to write schema.json: {}", e);
             return ExitCode::from(1);
         }
     }

@@ -184,32 +184,3 @@ pub fn write_default_config(repo_root: &Path) -> Result<(), String> {
     std::fs::write(&path, yaml).map_err(|e| format!("write config: {}", e))?;
     Ok(())
 }
-
-/// Default schema.json for report entries (version 1).
-pub fn default_schema_json() -> &'static str {
-    r#"{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "version": 1,
-  "description": "Code report entry schema",
-  "type": "object",
-  "properties": {
-    "id": { "type": "string", "pattern": "^CR-[0-9]{6}$" },
-    "path": { "type": "string" },
-    "range": {
-      "type": "object",
-      "properties": { "start": { "type": "integer" }, "end": { "type": "integer" } },
-      "required": ["start", "end"]
-    },
-    "tag": { "type": "string", "enum": ["todo", "refactor", "buggy", "critical"] },
-    "message": { "type": "string" },
-    "author": {
-      "type": "object",
-      "properties": { "git": { "type": "string" }, "codeowner": { "type": "string" } }
-    },
-    "created_at": { "type": "string", "format": "date" },
-    "expires_at": { "type": ["string", "null"], "format": "date" },
-    "status": { "type": "string", "enum": ["open", "resolved"] }
-  },
-  "required": ["id", "path", "range", "tag", "message", "author", "created_at", "status"]
-}"#
-}
