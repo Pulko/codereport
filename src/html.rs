@@ -24,8 +24,8 @@ pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::P
             let pct = (*count as f64 / max_tag_count * 100.0).min(100.0);
             let tag_class = tag_slug(tag);
             format!(
-                r#"<div class="bar-row"><span class="bar-label tag-dot {}">{}</span><div class="bar-wrap"><div class="bar {}" style="width:{}%"></div><span class="bar-value">{}</span></div></div>"#,
-                tag_class, escape_html(tag), tag_class, pct, count
+                r#"<div class="bar-row"><span class="bar-label tag-dot {}">{}</span><div class="bar-wrap" title="{}"><div class="bar {}" style="width:{}%"></div></div><span class="bar-value">{}</span></div>"#,
+                tag_class, escape_html(tag), count, tag_class, pct, count
             )
         })
         .collect();
@@ -117,21 +117,21 @@ body {{ font-family: var(--font); margin: 0; background: var(--bg); color: var(-
 .section {{ margin-bottom: 24px; }}
 .section-title {{ font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 12px; }}
 
-.bar-rows {{ display: flex; flex-direction: column; gap: 6px; }}
-.bar-row {{ display: flex; align-items: center; gap: 10px; }}
-.bar-label {{ width: 82px; flex-shrink: 0; font-size: 13px; }}
+.bar-rows {{ display: flex; flex-direction: column; gap: 8px; }}
+.bar-row {{ display: flex; align-items: center; gap: 12px; }}
+.bar-label {{ width: 86px; flex-shrink: 0; font-size: 13px; color: var(--text); }}
 .bar-label.tag-dot::before {{ content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 0.15em; }}
 .bar-label.tag-dot.critical::before {{ background: var(--danger); }}
 .bar-label.tag-dot.buggy::before {{ background: var(--warn); }}
 .bar-label.tag-dot.refactor::before {{ background: #8b5cf6; }}
 .bar-label.tag-dot.todo::before {{ background: var(--muted); }}
-.bar-wrap {{ flex: 1; display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; min-height: 24px; }}
-.bar {{ height: 100%; min-width: 4px; border-radius: 4px; transition: width 0.2s; }}
-.bar.critical {{ background: linear-gradient(90deg, var(--danger-dim), var(--danger)); }}
-.bar.buggy {{ background: linear-gradient(90deg, var(--warn-dim), var(--warn)); }}
-.bar.refactor {{ background: linear-gradient(90deg, #3b2760, #8b5cf6); }}
-.bar.todo {{ background: linear-gradient(90deg, #374151, var(--muted)); }}
-.bar-value {{ margin-left: 10px; font-variant-numeric: tabular-nums; font-weight: 500; color: var(--text-strong); }}
+.bar-wrap {{ width: 160px; flex-shrink: 0; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }}
+.bar {{ height: 100%; border-radius: 4px; min-width: 2px; transition: width 0.2s ease; }}
+.bar.critical {{ background: var(--danger); }}
+.bar.buggy {{ background: var(--warn); }}
+.bar.refactor {{ background: #8b5cf6; }}
+.bar.todo {{ background: var(--muted); }}
+.bar-value {{ width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }}
 
 .heatmap-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; }}
 .heatmap {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
