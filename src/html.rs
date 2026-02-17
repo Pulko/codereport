@@ -1,11 +1,20 @@
 use crate::reports::Reports;
+use chrono::Utc;
 use std::collections::HashMap;
 use std::path::Path;
 
-pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::PathBuf, String> {
-    let json = serde_json::to_string(&reports.entries).map_err(|e| e.to_string())?;
-    let json_escaped = escape_json_for_script(&json);
+struct DashboardStats {
+    total: usize,
+    open: usize,
+    resolved: usize,
+    critical: usize,
+    expired: usize,
+    expiring_soon: usize,
+}
 
+pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::PathBuf, String> {
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let stats = compute_stats(reports, &today);
     let (tag_counts, file_counts, heatmap) = compute_chart_data(reports);
 
     let max_tag_count = tag_counts.iter().map(|(_, c)| *c).max().unwrap_or(1) as f64;
@@ -13,27 +22,23 @@ pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::P
         .iter()
         .map(|(tag, count)| {
             let pct = (*count as f64 / max_tag_count * 100.0).min(100.0);
+            let tag_class = tag_slug(tag);
             format!(
-                r#"<div class="bar-row"><span class="bar-label">{}</span><div class="bar-wrap"><div class="bar" style="width:{}%"></div><span class="bar-value">{}</span></div></div>"#,
-                escape_html(tag), pct, count
+                r#"<div class="bar-row"><span class="bar-label tag-dot {}">{}</span><div class="bar-wrap"><div class="bar {}" style="width:{}%"></div><span class="bar-value">{}</span></div></div>"#,
+                tag_class, escape_html(tag), tag_class, pct, count
             )
         })
         .collect();
 
-    let file_rows: String = file_counts
-        .iter()
-        .take(15)
-        .map(|(path, count)| format!("<tr><td>{}</td><td>{}</td></tr>", escape_html(path), count))
-        .collect();
-
     let tags: Vec<&String> = tag_counts.iter().map(|(t, _)| t).collect();
-    let files: Vec<&String> = file_counts.iter().take(20).map(|(p, _)| p).collect();
+    let files: Vec<&String> = file_counts.iter().take(30).map(|(p, _)| p).collect();
     let heatmap_rows: String = {
         let mut rows = String::new();
         for path in &files {
             rows.push_str("<tr>");
             rows.push_str(&format!(
-                "<td class=\"path-cell\">{}</td>",
+                "<td class=\"path-cell\" title=\"{}\">{}</td>",
+                escape_attr(path),
                 escape_html(path)
             ));
             for tag in &tags {
@@ -42,18 +47,17 @@ pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::P
                     .and_then(|m| m.get(*tag))
                     .copied()
                     .unwrap_or(0);
-                let class = if count > 0 {
-                    if count >= 3 {
-                        "heat hi"
-                    } else if count >= 2 {
-                        "heat mid"
-                    } else {
-                        "heat lo"
-                    }
+                let tag_class = tag_slug(tag);
+                let (heat_class, title) = if count > 0 {
+                    let level = if count >= 3 { "hi" } else if count >= 2 { "mid" } else { "lo" };
+                    (format!("heat {} {}", level, tag_class), format!("{}: {}", tag, count))
                 } else {
-                    ""
+                    ("".to_string(), "".to_string())
                 };
-                rows.push_str(&format!("<td class=\"{}\">{}</td>", class, count));
+                rows.push_str(&format!(
+                    "<td class=\"{}\" title=\"{}\">{}</td>",
+                    heat_class, title, if count > 0 { count.to_string() } else { "—".to_string() }
+                ));
             }
             rows.push_str("</tr>");
         }
@@ -62,7 +66,10 @@ pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::P
 
     let tag_headers: String = tags
         .iter()
-        .map(|t| format!("<th>{}</th>", escape_html(t)))
+        .map(|t| {
+            let slug = tag_slug(t);
+            format!("<th class=\"tag-th {}\">{}</th>", slug, escape_html(t))
+        })
         .collect();
 
     let html = format!(
@@ -70,85 +77,136 @@ pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::P
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Code Reports</title>
 <style>
+:root {{
+  --bg: #0b0c0e;
+  --surface: #16181c;
+  --border: #2a2d33;
+  --muted: #6b7280;
+  --text: #e5e7eb;
+  --text-strong: #f9fafb;
+  --accent: #3b82f6;
+  --accent-dim: #1e3a5f;
+  --success: #10b981;
+  --success-dim: #064e3b;
+  --warn: #f59e0b;
+  --warn-dim: #451a03;
+  --danger: #ef4444;
+  --danger-dim: #450a0a;
+  --radius: 8px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}}
 * {{ box-sizing: border-box; }}
-body {{ font-family: system-ui, sans-serif; margin: 1rem 2rem; background: #1a1a1a; color: #e0e0e0; }}
-h1 {{ margin-bottom: 0.5rem; }}
-h2 {{ margin-top: 1.5rem; color: #b0b0b0; font-size: 1rem; }}
-.section {{ margin-bottom: 2rem; }}
-.bar-row {{ display: flex; align-items: center; margin-bottom: 0.4rem; }}
-.bar-label {{ width: 100px; flex-shrink: 0; }}
-.bar-wrap {{ flex: 1; display: flex; align-items: center; background: #2a2a2a; border-radius: 4px; overflow: hidden; }}
-.bar {{ height: 20px; background: #4a9; min-width: 2px; }}
-.bar-value {{ margin-left: 8px; font-variant-numeric: tabular-nums; }}
-table {{ border-collapse: collapse; font-size: 0.9rem; }}
-th, td {{ padding: 0.35rem 0.6rem; text-align: left; border: 1px solid #333; }}
-th {{ background: #2a2a2a; }}
-.path-cell {{ max-width: 280px; overflow: hidden; text-overflow: ellipsis; }}
-.heat {{ text-align: center; }}
-.heat.lo {{ background: #2d4a2d; }}
-.heat.mid {{ background: #3d6a3d; }}
-.heat.hi {{ background: #4a904a; }}
-#report-table {{ width: 100%; }}
-#report-table th {{ cursor: pointer; }}
+body {{ font-family: var(--font); margin: 0; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }}
+.page {{ max-width: 1200px; margin: 0 auto; padding: 24px; }}
+
+.header {{ margin-bottom: 24px; }}
+.header h1 {{ font-size: 1.5rem; font-weight: 600; color: var(--text-strong); margin: 0 0 4px 0; }}
+.header p {{ color: var(--muted); margin: 0; font-size: 13px; }}
+
+.stats {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }}
+.stat {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }}
+.stat-value {{ font-size: 1.5rem; font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }}
+.stat-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 2px; }}
+.stat.danger .stat-value {{ color: var(--danger); }}
+.stat.warn .stat-value {{ color: var(--warn); }}
+.stat.success .stat-value {{ color: var(--success); }}
+
+.section {{ margin-bottom: 24px; }}
+.section-title {{ font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 12px; }}
+
+.bar-rows {{ display: flex; flex-direction: column; gap: 6px; }}
+.bar-row {{ display: flex; align-items: center; gap: 10px; }}
+.bar-label {{ width: 82px; flex-shrink: 0; font-size: 13px; }}
+.bar-label.tag-dot::before {{ content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 0.15em; }}
+.bar-label.tag-dot.critical::before {{ background: var(--danger); }}
+.bar-label.tag-dot.buggy::before {{ background: var(--warn); }}
+.bar-label.tag-dot.refactor::before {{ background: #8b5cf6; }}
+.bar-label.tag-dot.todo::before {{ background: var(--muted); }}
+.bar-wrap {{ flex: 1; display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; min-height: 24px; }}
+.bar {{ height: 100%; min-width: 4px; border-radius: 4px; transition: width 0.2s; }}
+.bar.critical {{ background: linear-gradient(90deg, var(--danger-dim), var(--danger)); }}
+.bar.buggy {{ background: linear-gradient(90deg, var(--warn-dim), var(--warn)); }}
+.bar.refactor {{ background: linear-gradient(90deg, #3b2760, #8b5cf6); }}
+.bar.todo {{ background: linear-gradient(90deg, #374151, var(--muted)); }}
+.bar-value {{ margin-left: 10px; font-variant-numeric: tabular-nums; font-weight: 500; color: var(--text-strong); }}
+
+.heatmap-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; }}
+.heatmap {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
+.heatmap th, .heatmap td {{ padding: 8px 10px; border-bottom: 1px solid var(--border); }}
+.heatmap thead th {{ text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface); position: sticky; top: 0; z-index: 1; }}
+.heatmap thead th.tag-th {{ text-align: center; min-width: 44px; }}
+.heatmap .path-cell {{ max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }}
+.heatmap tbody tr:hover {{ background: rgba(59, 130, 246, 0.06); }}
+.heatmap tbody td {{ text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }}
+.heatmap .heat {{ font-weight: 600; color: var(--text-strong); }}
+.heatmap .heat.lo.critical {{ background: rgba(239, 68, 68, 0.2); color: #fca5a5; }}
+.heatmap .heat.mid.critical {{ background: rgba(239, 68, 68, 0.35); color: #fecaca; }}
+.heatmap .heat.hi.critical {{ background: rgba(239, 68, 68, 0.5); color: #fee2e2; }}
+.heatmap .heat.lo.buggy {{ background: rgba(245, 158, 11, 0.2); color: #fcd34d; }}
+.heatmap .heat.mid.buggy {{ background: rgba(245, 158, 11, 0.35); color: #fde68a; }}
+.heatmap .heat.hi.buggy {{ background: rgba(245, 158, 11, 0.5); color: #fef3c7; }}
+.heatmap .heat.lo.refactor {{ background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }}
+.heatmap .heat.mid.refactor {{ background: rgba(139, 92, 246, 0.35); color: #ddd6fe; }}
+.heatmap .heat.hi.refactor {{ background: rgba(139, 92, 246, 0.5); color: #ede9fe; }}
+.heatmap .heat.lo.todo {{ background: rgba(107, 114, 128, 0.25); color: #9ca3af; }}
+.heatmap .heat.mid.todo {{ background: rgba(107, 114, 128, 0.4); color: #d1d5db; }}
+.heatmap .heat.hi.todo {{ background: rgba(107, 114, 128, 0.55); color: #e5e7eb; }}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+<div class="page">
+<header class="header">
 <h1>Code Reports</h1>
-<p>Generated from .codereports/reports.yaml</p>
+<p>Generated from .codereports/reports.yaml · {}</p>
+</header>
+
+<div class="stats">
+<div class="stat"><div class="stat-value">{}</div><div class="stat-label">Total</div></div>
+<div class="stat success"><div class="stat-value">{}</div><div class="stat-label">Open</div></div>
+<div class="stat"><div class="stat-value">{}</div><div class="stat-label">Resolved</div></div>
+<div class="stat danger"><div class="stat-value">{}</div><div class="stat-label">Critical</div></div>
+<div class="stat danger"><div class="stat-value">{}</div><div class="stat-label">Expired</div></div>
+<div class="stat warn"><div class="stat-value">{}</div><div class="stat-label">Expiring soon</div></div>
+</div>
 
 <div class="section">
-<h2>By tag</h2>
+<div class="section-title">By tag</div>
 <div class="bar-rows">
 {}
 </div>
 </div>
 
 <div class="section">
-<h2>Files with most reports (top 15)</h2>
-<table>
-<thead><tr><th>Path</th><th>Count</th></tr></thead>
-<tbody>
-{}
-</tbody>
-</table>
-</div>
-
-<div class="section">
-<h2>Tag × file heatmap (top 20 files)</h2>
+<div class="section-title">File × tag heatmap (top 30 files)</div>
+<div class="heatmap-wrap">
 <table class="heatmap">
-<thead><tr><th>Path</th>{}</tr></thead>
+<thead><tr><th>File</th>{}</tr></thead>
 <tbody>
 {}
 </tbody>
 </table>
 </div>
-
-<div class="section">
-<h2>All reports</h2>
-<table id="report-table">
-<thead><tr><th>ID</th><th>Path</th><th>Range</th><th>Tag</th><th>Status</th><th>Message</th><th>Created</th><th>Expires</th></tr></thead>
-<tbody id="report-tbody"></tbody>
-</table>
 </div>
-
-<script type="application/json" id="report-data">{}</script>
-<script>
-(function() {{
-  var data = JSON.parse(document.getElementById('report-data').textContent);
-  var tbody = document.getElementById('report-tbody');
-  data.forEach(function(e) {{
-    var tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + e.id + '</td><td>' + e.path + '</td><td>' + e.range.start + '-' + e.range.end + '</td><td>' + e.tag + '</td><td>' + e.status + '</td><td>' + e.message + '</td><td>' + (e.created_at || '') + '</td><td>' + (e.expires_at || '') + '</td>';
-    tbody.appendChild(tr);
-  }});
-}})();
-</script>
+</div>
 </body>
 </html>
 "##,
-        tag_bars, file_rows, tag_headers, heatmap_rows, json_escaped
+        escape_html(&today),
+        stats.total,
+        stats.open,
+        stats.resolved,
+        stats.critical,
+        stats.expired,
+        stats.expiring_soon,
+        tag_bars,
+        tag_headers,
+        heatmap_rows
     );
 
     let out_dir = repo_root.join(".codereports").join("html");
@@ -158,14 +216,81 @@ th {{ background: #2a2a2a; }}
     Ok(index_path)
 }
 
-fn escape_json_for_script(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('<', "\\u003c")
-        .replace('>', "\\u003e")
-        .replace('&', "\\u0026")
+fn tag_slug(tag: &str) -> &'static str {
+    let t = tag.to_lowercase();
+    match t.as_str() {
+        "critical" => "critical",
+        "buggy" => "buggy",
+        "refactor" => "refactor",
+        "todo" => "todo",
+        _ => "todo",
+    }
+}
+
+fn compute_stats(reports: &Reports, today: &str) -> DashboardStats {
+    let mut open = 0usize;
+    let mut resolved = 0usize;
+    let mut critical = 0usize;
+    let mut expired = 0usize;
+    let mut expiring_soon = 0usize;
+
+    for e in &reports.entries {
+        if e.status.eq_ignore_ascii_case("open") {
+            open += 1;
+        } else {
+            resolved += 1;
+        }
+        if e.tag.eq_ignore_ascii_case("critical") {
+            critical += 1;
+        }
+        if let Some(ref exp) = e.expires_at {
+            let exp_str = exp.trim();
+            if !exp_str.is_empty() {
+                if exp_str < today {
+                    expired += 1;
+                } else if days_between(today, exp_str) <= 7 {
+                    expiring_soon += 1;
+                }
+            }
+        }
+    }
+
+    DashboardStats {
+        total: reports.entries.len(),
+        open,
+        resolved,
+        critical,
+        expired,
+        expiring_soon,
+    }
+}
+
+/// Days between two YYYY-MM-DD strings (order-insensitive absolute difference).
+fn days_between(a: &str, b: &str) -> i64 {
+    let parse = |s: &str| {
+        let parts: Vec<&str> = s.split('-').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        let y: i32 = parts[0].parse().ok()?;
+        let m: u32 = parts[1].parse().ok()?;
+        let d: u32 = parts[2].parse().ok()?;
+        chrono::NaiveDate::from_ymd_opt(y, m, d)
+    };
+    match (parse(a), parse(b)) {
+        (Some(d1), Some(d2)) => (d2 - d1).num_days().abs(),
+        _ => 999,
+    }
 }
 
 fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+fn escape_attr(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
