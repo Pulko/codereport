@@ -1,4 +1,4 @@
-name: 'codereport'
+name: 'Code Report CI'
 description: 'Run codereport in CI: check for blocking or expired code reports, or run init, list, html'
 author: 'Pulko'
 
