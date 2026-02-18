@@ -92,7 +92,7 @@ Resolved reports are ignored. When the check fails, it prints each violating rep
 
 ### Installing in CI
 
-**GitHub Actions:** The easiest way is the [codereport action](action/action.yml) — it installs codereport and runs `check` (or another command) in one step. See the example below.
+**GitHub Actions:** The easiest way is the [codereport action](action.yml) — it installs codereport and runs `check` (or another command) in one step. See the example below.
 
 **Other CI / manual install:** Install the binary before running `check`:
 
