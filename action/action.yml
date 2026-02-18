@@ -1,0 +1,97 @@
+name: 'codereport'
+description: 'Run codereport in CI: check for blocking or expired code reports, or run init, list, html'
+author: 'Pulko'
+
+branding:
+  icon: 'check'
+  color: 'blue'
+
+inputs:
+  command:
+    description: 'codereport subcommand (check, init, list, html)'
+    required: false
+    default: 'check'
+
+  arguments:
+    description: 'Extra CLI arguments (e.g. for list: --tag buggy --status open, for html: --no-open)'
+    required: false
+    default: ''
+
+  version:
+    description: 'Version of codereport to use (crates.io version or "latest")'
+    required: false
+    default: 'latest'
+
+  working-directory:
+    description: 'Working directory to run codereport in (repo root with .codereports/)'
+    required: false
+    default: '.'
+
+  fail-on-error:
+    description: 'Whether to fail the workflow if codereport exits non-zero'
+    required: false
+    default: 'true'
+
+outputs:
+  result:
+    description: 'Combined stdout and stderr from the codereport command'
+    value: ${{ steps.codereport.outputs.result }}
+
+  exit-code:
+    description: 'Exit code from the codereport command'
+    value: ${{ steps.codereport.outputs.exit-code }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.cargo/bin
+        key: ${{ runner.os }}-cargo-codereport-${{ inputs.version }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-codereport-
+          ${{ runner.os }}-cargo-
+
+    - name: Install codereport
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          echo "Installing latest version of codereport..."
+          cargo install codereport
+        else
+          echo "Installing codereport version ${{ inputs.version }}..."
+          cargo install codereport --version "${{ inputs.version }}"
+        fi
+
+    - name: Run codereport
+      id: codereport
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Running codereport ${{ inputs.command }} ${{ inputs.arguments }} in ${{ inputs.working-directory }}"
+
+        set +e
+        OUTPUT=$(codereport ${{ inputs.command }} ${{ inputs.arguments }} 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        echo "result<<EOF" >> $GITHUB_OUTPUT
+        echo "$OUTPUT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+        echo "$OUTPUT"
+
+        if [ $EXIT_CODE -ne 0 ] && [ "${{ inputs.fail-on-error }}" = "true" ]; then
+          echo "::error::codereport ${{ inputs.command }} failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
+        echo "codereport ${{ inputs.command }} completed with exit code $EXIT_CODE"

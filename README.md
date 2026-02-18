@@ -92,7 +92,9 @@ Resolved reports are ignored. When the check fails, it prints each violating rep
 
 ### Installing in CI
 
-Install the binary before running `check`:
+**GitHub Actions:** The easiest way is the [codereport action](action/action.yml) — it installs codereport and runs `check` (or another command) in one step. See the example below.
+
+**Other CI / manual install:** Install the binary before running `check`:
 
 - **From crates.io:** `cargo install codereport` (ensure `cargo` is available in the job).
 - **From source:** clone the repo and run `cargo build --release`; use the binary from `target/release/codereport`.
@@ -105,6 +107,8 @@ codereport check
 
 ### Example: GitHub Actions
 
+Using the **codereport action** (recommended):
+
 ```yaml
 name: codereport
 on:
@@ -115,14 +119,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Pulko/codereport/action@v1
+        # Optional: version: '0.1.2'  # pin to a release; default is 'latest'
+```
+
+Add this job to your workflow so PRs cannot merge while blocking or expired reports are open. To run other commands (`init`, `list`, `html`), set the `command` input and optionally `arguments` (e.g. `arguments: '--tag critical --status open'` for `list`).
+
+**Manual install** (no action):
+
+```yaml
+    steps:
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - run: cargo install codereport
       - run: codereport check
 ```
-
-Add this job to your workflow so PRs cannot merge while blocking or expired reports are open.
 
 ### Example: GitLab CI
 
