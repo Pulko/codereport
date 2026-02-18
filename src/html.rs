@@ -49,14 +49,29 @@ pub fn generate_html(repo_root: &Path, reports: &Reports) -> Result<std::path::P
                     .unwrap_or(0);
                 let tag_class = tag_slug(tag);
                 let (heat_class, title) = if count > 0 {
-                    let level = if count >= 3 { "hi" } else if count >= 2 { "mid" } else { "lo" };
-                    (format!("heat {} {}", level, tag_class), format!("{}: {}", tag, count))
+                    let level = if count >= 3 {
+                        "hi"
+                    } else if count >= 2 {
+                        "mid"
+                    } else {
+                        "lo"
+                    };
+                    (
+                        format!("heat {} {}", level, tag_class),
+                        format!("{}: {}", tag, count),
+                    )
                 } else {
                     ("".to_string(), "".to_string())
                 };
                 rows.push_str(&format!(
                     "<td class=\"{}\" title=\"{}\">{}</td>",
-                    heat_class, title, if count > 0 { count.to_string() } else { "—".to_string() }
+                    heat_class,
+                    title,
+                    if count > 0 {
+                        count.to_string()
+                    } else {
+                        "—".to_string()
+                    }
                 ));
             }
             rows.push_str("</tr>");
